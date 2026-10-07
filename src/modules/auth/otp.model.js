@@ -10,16 +10,6 @@ const otpChallengeSchema = new mongoose.Schema(
       index: true,
     },
 
-    purpose: {
-      type: String,
-      enum: [
-        'login',
-        'registration',
-        'email_verification',
-      ],
-      required: true,
-    },
-
     otpHash: {
       type: String,
       required: true,
@@ -46,9 +36,7 @@ const otpChallengeSchema = new mongoose.Schema(
       default: null,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 otpChallengeSchema.index(

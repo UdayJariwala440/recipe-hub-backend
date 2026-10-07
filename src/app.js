@@ -8,10 +8,10 @@ import { errorMiddleware } from "./middleware/error.middleware.js";
 const app = express();
 
 // Security middleware
-app.use(securityMiddleware);
+securityMiddleware(app);
 
 // CORS
-app.use(corsMiddleware);
+corsMiddleware(app);
 
 // Parse JSON request body
 app.use(express.json({ limit: "1mb" }));

@@ -1,22 +1,49 @@
 import express from "express";
-import { register, requestLogin, verifyLogin, verifyRegistration } from "./auth.controller.js";
+import {
+  register,
+  requestLogin,
+  verifyOtp,
+  resendOtp,
+  refresh,
+  logout,
+} from "./auth.controller.js";
 import {
   registerSchema,
   loginRequestSchema,
-  loginVerifySchema,
-  registerVerifySchema,
+  otpVerifySchema,
+  otpResendSchema,
+  refreshTokenSchema,
+  logoutSchema,
 } from "./auth.validation.js";
 import { validate } from "../../middleware/validation.middleware.js";
+import {
+  authRateLimiter,
+  otpRequestRateLimiter,
+  otpVerifyRateLimiter,
+} from "../../middleware/rateLimit.middleware.js";
 
 const router = express.Router();
 
-router.post("/register", validate(registerSchema), register);
-router.post("/login/request", validate(loginRequestSchema), requestLogin);
-router.post("/login/verify", validate(loginVerifySchema), verifyLogin);
+router.post("/register", authRateLimiter, validate(registerSchema), register);
 router.post(
-  '/register/verify',
-  validate(registerVerifySchema),
-  verifyRegistration
+  "/login/request",
+  otpRequestRateLimiter,
+  validate(loginRequestSchema),
+  requestLogin,
 );
+router.post(
+  "/otp/verify",
+  otpVerifyRateLimiter,
+  validate(otpVerifySchema),
+  verifyOtp,
+);
+router.post(
+  "/otp/resend",
+  otpRequestRateLimiter,
+  validate(otpResendSchema),
+  resendOtp,
+);
+router.post("/refresh", authRateLimiter, validate(refreshTokenSchema), refresh);
+router.post("/logout", authRateLimiter, validate(logoutSchema), logout);
 
 export default router;
