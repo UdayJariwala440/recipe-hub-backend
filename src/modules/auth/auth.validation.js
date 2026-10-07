@@ -37,3 +37,19 @@ export const loginVerifySchema = z
       .regex(/^\d{6}$/, 'OTP must be 6 digits'),
   })
   .strict();
+
+
+  export const registerVerifySchema = z
+  .object({
+    challengeId: z
+      .string()
+      .min(1, 'Challenge ID is required'),
+
+    otp: z
+      .string()
+      .regex(
+        /^\d{6}$/,
+        'OTP must be exactly 6 digits'
+      ),
+  })
+  .strict();

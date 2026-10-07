@@ -1,5 +1,4 @@
 import User from "../users/user.model.js";
-import { hashPassword, verifyPassword } from "../../utils/password.js";
 import {
   RESPONSE_MESSAGES,
   STATUS_CODES,
@@ -8,15 +7,111 @@ import {   generateOtp,
   hashOtp,
   verifyOtp, } from "../../utils/otp.js";
 import OtpChallenge from './otp.model.js';
-import {
-  generateOtp,
-  hashOtp,
-  verifyOtp,
-} from '../../utils/otp.js';
+
 
 import { sendOtp } from '../../services/otp/otp-delivery.service.js';
 
 
+export const verifyRegistrationOtp = async ({
+  challengeId,
+  otp,
+}) => {
+  const challenge = await OtpChallenge
+    .findOne({
+      _id: challengeId,
+      purpose: 'registration',
+    })
+    .select('+otpHash');
+
+  if (!challenge) {
+    const error = new Error(
+      'Invalid or expired verification code'
+    );
+
+    error.statusCode = STATUS_CODES.UNAUTHORIZED;
+
+    throw error;
+  }
+
+  if (challenge.usedAt) {
+    const error = new Error(
+      'Verification code has already been used'
+    );
+
+    error.statusCode = STATUS_CODES.UNAUTHORIZED;
+
+    throw error;
+  }
+
+  if (challenge.expiresAt <= new Date()) {
+    const error = new Error(
+      'Verification code has expired'
+    );
+
+    error.statusCode = STATUS_CODES.UNAUTHORIZED;
+
+    throw error;
+  }
+
+  if (challenge.attempts >= challenge.maxAttempts) {
+    const error = new Error(
+      'Too many verification attempts'
+    );
+
+    error.statusCode = STATUS_CODES.TOO_MANY_REQUESTS;
+
+    throw error;
+  }
+
+  challenge.attempts += 1;
+
+  await challenge.save();
+
+  const validOtp = await verifyOtp(
+    otp,
+    challenge.otpHash
+  );
+
+  if (!validOtp) {
+    const error = new Error(
+      'Invalid or expired verification code'
+    );
+
+    error.statusCode = STATUS_CODES.UNAUTHORIZED;
+
+    throw error;
+  }
+
+  challenge.usedAt = new Date();
+
+  await challenge.save();
+
+  const user = await User.findOne({
+    email: challenge.email,
+  });
+
+  if (!user) {
+    const error = new Error(
+      'Unable to verify account'
+    );
+
+    error.statusCode = STATUS_CODES.UNAUTHORIZED;
+
+    throw error;
+  }
+
+  user.isEmailVerified = true;
+
+  await user.save();
+
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    isEmailVerified: user.isEmailVerified,
+  };
+};
 export const registerUser = async ({ name, email, password, role }) => {
   const existingUser = await User.findOne({ email });
 
@@ -26,13 +121,20 @@ export const registerUser = async ({ name, email, password, role }) => {
     throw error;
   }
 
-  const passwordHash = await hashPassword(password);
+  const user = await User.create({ name, email });
 
-  const user = await User.create({
-    name,
+  const otp = generateOtp();
+  const otpHash = await hashOtp(otp);
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+  const challenge = await OtpChallenge.create({
     email,
-    passwordHash,
+    purpose: 'registration',
+    otpHash,
+    expiresAt,
   });
+
+  await sendOtp({ email, otp });
 
   return {
     id: user._id,
@@ -40,6 +142,7 @@ export const registerUser = async ({ name, email, password, role }) => {
     email: user.email,
     role: user.role,
     isEmailVerified: user.isEmailVerified,
+    challengeId: challenge._id,
   };
 };
 
